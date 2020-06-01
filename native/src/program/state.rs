@@ -1,5 +1,5 @@
 use crate::{
-    Cache, Command, Debug, Event, Point, Program, Renderer, Size, UserInterface,
+    Cache, Command, Damage, Debug, Event, Point, Program, Rectangle, Renderer, Size, UserInterface,
 };
 
 /// The execution state of a [`Program`]. It leverages caching, event
@@ -85,7 +85,8 @@ where
     /// the widgets of the linked [`Program`] if necessary.
     ///
     /// Returns the [`Command`] obtained from [`Program`] after updating it,
-    /// only if an update was necessary.
+    /// only if an update was necessary; and a damage rectangle if any pixels
+    /// changed from the previous frame.
     pub fn update(
         &mut self,
         bounds: Size,
@@ -93,7 +94,7 @@ where
         renderer: &mut P::Renderer,
         clipboard: &mut P::Clipboard,
         debug: &mut Debug,
-    ) -> Option<Command<P::Message>> {
+    ) -> (Option<Command<P::Message>>, Option<Vec<Rectangle>>) {
         let mut user_interface = build_user_interface(
             &mut self.program,
             self.cache.take().unwrap(),
@@ -119,12 +120,15 @@ where
 
         if messages.is_empty() {
             debug.draw_started();
-            self.primitive = user_interface.draw(renderer, cursor_position);
+            let primitive = user_interface.draw(renderer, cursor_position);
             debug.draw_finished();
 
             self.cache = Some(user_interface.into_cache());
 
-            None
+            let damage = self.primitive.damage(&primitive);
+            self.primitive = primitive;
+
+            (None, damage)
         } else {
             // When there are messages, we are forced to rebuild twice
             // for now :^)
@@ -150,12 +154,15 @@ where
             );
 
             debug.draw_started();
-            self.primitive = user_interface.draw(renderer, cursor_position);
+            let primitive = user_interface.draw(renderer, cursor_position);
             debug.draw_finished();
 
             self.cache = Some(user_interface.into_cache());
 
-            Some(commands)
+            let damage = self.primitive.damage(&primitive);
+            self.primitive = primitive;
+
+            (Some(commands), damage)
         }
     }
 }
