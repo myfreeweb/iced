@@ -12,7 +12,6 @@ pub struct Compositor {
     device: wgpu::Device,
     queue: wgpu::Queue,
     staging_belt: wgpu::util::StagingBelt,
-    local_pool: futures::executor::LocalPool,
 }
 
 impl Compositor {
@@ -60,7 +59,6 @@ impl Compositor {
             .ok()?;
 
         let staging_belt = wgpu::util::StagingBelt::new(Self::CHUNK_SIZE);
-        let local_pool = futures::executor::LocalPool::new();
 
         Some(Compositor {
             instance,
@@ -68,7 +66,6 @@ impl Compositor {
             device,
             queue,
             staging_belt,
-            local_pool,
         })
     }
 
@@ -181,12 +178,7 @@ impl iced_graphics::window::Compositor for Compositor {
         self.queue.submit(Some(encoder.finish()));
 
         // Recall staging buffers
-        self.local_pool
-            .spawner()
-            .spawn(self.staging_belt.recall())
-            .expect("Recall staging belt");
-
-        self.local_pool.run_until_stalled();
+        glib::MainContext::default().spawn_local(self.staging_belt.recall());
 
         mouse_interaction
     }
