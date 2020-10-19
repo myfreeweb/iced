@@ -55,6 +55,18 @@ impl Backend {
         }
     }
 
+    /// Do not evict a raster image handle from the cache on this frame
+    #[cfg(feature = "image_rs")]
+    pub fn retain_raster(&mut self, handle: &iced_native::image::Handle) {
+        self.image_pipeline.retain_raster(handle);
+    }
+
+    /// Do not evict a vector image handle from the cache on this frame
+    #[cfg(feature = "svg")]
+    pub fn retain_vector(&mut self, handle: &iced_native::svg::Handle) {
+        self.image_pipeline.retain_vector(handle);
+    }
+
     /// Draws the provided primitives in the given `TextureView`.
     ///
     /// The text provided as overlay will be rendered on top of the primitives.

@@ -283,6 +283,18 @@ impl Pipeline {
     }
 
     #[cfg(feature = "image_rs")]
+    pub fn retain_raster(&mut self, handle: &iced_native::image::Handle) {
+        let mut cache = self.raster_cache.borrow_mut();
+        let _ = cache.load(handle);
+    }
+
+    #[cfg(feature = "svg")]
+    pub fn retain_vector(&mut self, handle: &iced_native::svg::Handle) {
+        let mut cache = self.vector_cache.borrow_mut();
+        let _ = cache.load(handle);
+    }
+
+    #[cfg(feature = "image_rs")]
     pub fn dimensions(&self, handle: &image::Handle) -> (u32, u32) {
         let mut cache = self.raster_cache.borrow_mut();
         let memory = cache.load(&handle);
