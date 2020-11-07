@@ -1,6 +1,7 @@
 use crate::{Backend, Color, Error, Renderer, Settings, Viewport};
 
-use futures::task::SpawnExt;
+use futures::future::{AbortHandle, Abortable};
+use futures::prelude::*;
 use iced_native::{futures, mouse};
 use raw_window_handle::HasRawWindowHandle;
 
@@ -12,6 +13,7 @@ pub struct Compositor {
     device: wgpu::Device,
     queue: wgpu::Queue,
     staging_belt: wgpu::util::StagingBelt,
+    belt_emergency_stop: Option<AbortHandle>,
 }
 
 impl Compositor {
@@ -66,6 +68,7 @@ impl Compositor {
             device,
             queue,
             staging_belt,
+            belt_emergency_stop: None,
         })
     }
 
@@ -178,8 +181,21 @@ impl iced_graphics::window::Compositor for Compositor {
         self.queue.submit(Some(encoder.finish()));
 
         // Recall staging buffers
-        glib::MainContext::default().spawn_local(self.staging_belt.recall());
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        self.belt_emergency_stop = Some(abort_handle);
+        glib::MainContext::default().spawn_local(
+            Abortable::new(self.staging_belt.recall(), abort_registration)
+                .map(|_| ()),
+        );
 
         mouse_interaction
+    }
+}
+
+impl Drop for Compositor {
+    fn drop(&mut self) {
+        if let Some(abort_handle) = self.belt_emergency_stop.take() {
+            abort_handle.abort();
+        }
     }
 }
